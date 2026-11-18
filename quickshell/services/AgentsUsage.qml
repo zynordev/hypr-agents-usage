@@ -211,20 +211,29 @@ Singleton {
         root.refreshTokenStats();
     }
 
-    // Refresh limits every 5 minutes
+    // Refresh limits every 30 seconds
     Timer {
-        interval: 300000
+        interval: 30000
         repeat: true
         running: true
         onTriggered: root.refresh()
     }
 
-    // Refresh token stats every 15 minutes
+    // Refresh token stats every 3 minutes
     Timer {
-        interval: 900000
+        interval: 180000
         repeat: true
         running: true
         onTriggered: root.refreshTokenStats()
+    }
+
+    // Instant update whenever Claude writes fresh rate limits
+    FileView {
+        id: claudeWatcher
+        path: "/home/halil/.config/Claude/plan-usage-history.json"
+        onTextChanged: {
+            root.refresh()
+        }
     }
 
     Process {

@@ -119,7 +119,7 @@ AbstractBackgroundWidget {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onDoubleClicked: {
+            onClicked: {
                 AgentsUsage.refresh();
             }
         }
@@ -130,6 +130,11 @@ AbstractBackgroundWidget {
         columns: root.isVertical ? 1 : 3
         rows: root.isVertical ? 3 : 1
         spacing: root.cardSpacing
+        opacity: AgentsUsage.loading ? 0.75 : 1.0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 250 }
+        }
 
         Behavior on columns {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
@@ -361,7 +366,7 @@ AbstractBackgroundWidget {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                onDoubleClicked: {
+                onClicked: {
                     AgentsUsage.refresh();
                 }
             }
