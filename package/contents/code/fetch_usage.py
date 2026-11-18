@@ -17,6 +17,11 @@ import base64
 import fcntl
 import json
 import os
+import re
+import shutil
+import ssl
+import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -26,6 +31,7 @@ from datetime import datetime, timezone
 
 HOME = os.path.expanduser("~")
 CLAUDE_CREDS = os.path.join(HOME, ".claude", ".credentials.json")
+CLAUDE_PLAN_HISTORY = os.path.join(HOME, ".config", "Claude", "plan-usage-history.json")
 CODEX_HOME = os.environ.get("CODEX_HOME") or os.path.join(HOME, ".codex")
 CODEX_AUTH = os.path.join(CODEX_HOME, "auth.json")
 CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache"), "agents-usage")
@@ -78,16 +84,45 @@ def window(key, used, resets_at, model=None):
 # Claude
 
 
+def _fetch_claude_history_fallback(plan):
+    if os.path.exists(CLAUDE_PLAN_HISTORY):
+        try:
+            with open(CLAUDE_PLAN_HISTORY) as f:
+                d = json.load(f)
+            samples = [s for s in d.get("samples", []) if "fh" in s.get("u", {}) or "sd" in s.get("u", {})]
+            if samples:
+                last = samples[-1]
+                u = last.get("u", {})
+                windows = []
+                if "fh" in u:
+                    windows.append(window("session", float(u["fh"]), None))
+                if "sd" in u:
+                    windows.append(window("weekly", float(u["sd"]), None))
+                return {"plan": plan.capitalize() if plan else "Pro", "windows": windows}
+        except Exception:
+            pass
+    return None
+
+
 def fetch_claude():
+    plan = None
     try:
         with open(CLAUDE_CREDS) as f:
             oauth = json.load(f)["claudeAiOauth"]
+            plan = oauth.get("subscriptionType")
     except (OSError, ValueError, KeyError):
-        raise FetchError("claude_no_login")
+        oauth = None
 
     # The token is only read, never refreshed: Claude Code rotates the refresh
     # token itself and a second writer could log it out.
-    if oauth.get("expiresAt", 0) / 1000 < time.time():
+    token_valid = oauth and oauth.get("accessToken") and oauth.get("expiresAt", 0) / 1000 >= time.time()
+    
+    if not token_valid:
+        fallback = _fetch_claude_history_fallback(plan)
+        if fallback:
+            return fallback
+        if not oauth:
+            raise FetchError("claude_no_login")
         raise FetchError("claude_expired")
 
     try:
@@ -97,10 +132,15 @@ def fetch_claude():
             "User-Agent": "agents-usage-plasmoid",
             "Accept": "application/json",
         })
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
-            raise FetchError("claude_invalid")
-        raise FetchError("http", str(e.code))
+    except (urllib.error.HTTPError, FetchError) as e:
+        fallback = _fetch_claude_history_fallback(plan)
+        if fallback:
+            return fallback
+        if isinstance(e, urllib.error.HTTPError):
+            if e.code in (401, 403):
+                raise FetchError("claude_invalid")
+            raise FetchError("http", str(e.code))
+        raise e
 
     windows = []
     for key in ("five_hour", "seven_day"):
@@ -117,7 +157,6 @@ def fetch_claude():
         if model and lim.get("percent") is not None:
             windows.append(window("weekly_scoped", lim["percent"], lim.get("resets_at"), model))
 
-    plan = oauth.get("subscriptionType")
     return {"plan": plan.capitalize() if plan else None, "windows": windows}
 
 
@@ -263,10 +302,187 @@ def fetch_codex():
     return {"plan": CODEX_PLAN_NAMES.get(plan, plan.capitalize()) if plan else None, "windows": windows}
 
 
+# Antigravity
+#
+# `agy -p "/usage"` prints the limits, one tab-separated line per limit:
+# group, label, remaining, reset time.
+
+AG_CLI_TIMEOUT = 25
+AG_GROUP_MODELS = {"Gemini Models": "Gemini", "Claude and GPT models": "Claude & GPT"}
+AG_ARGON_GROUP = "Gemini 4 Argon"
+
+
+def agy_binary():
+    found = shutil.which("agy") or os.path.join(HOME, ".local", "bin", "agy") or os.path.join(HOME, ".gemini", "antigravity-cli", "bin", "agy")
+    if not os.path.exists(found):
+        raise FetchError("ag_missing")
+    return found
+
+
+def run_agy_usage():
+    try:
+        out = subprocess.run([agy_binary(), "-p", "/usage"], capture_output=True, text=True, timeout=AG_CLI_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise FetchError("ag_timeout")
+    except OSError as e:
+        raise FetchError("ag_missing", e.strerror)
+    if out.returncode != 0 and not out.stdout.strip():
+        raise FetchError("ag_failed", (out.stderr or "").strip()[:200] or str(out.returncode))
+    return out.stdout
+
+
+def parse_agy_usage(text, now=None):
+    windows = []
+    for line in text.splitlines():
+        cols = [c.strip() for c in line.split("\t")]
+        if len(cols) < 3:
+            continue
+        group, label, value = cols[0], cols[1], cols[2]
+        reset = cols[3] if len(cols) > 3 and cols[3] else None
+        if "Five Hour" in label:
+            key = "session"
+        elif "Weekly" in label:
+            key = "weekly"
+        else:
+            continue
+        if group == AG_ARGON_GROUP:
+            key, model = "weekly_scoped", AG_ARGON_GROUP
+        else:
+            model = AG_GROUP_MODELS.get(group, group)
+        if value == "disabled":
+            windows.append({"key": key, "model": model, "usedPercent": None, "resetsAt": None})
+            continue
+        if not value.endswith("%"):
+            continue
+        try:
+            remaining = float(value[:-1])
+        except ValueError:
+            continue
+        windows.append(window(key, 100 - remaining, reset, model))
+    return windows
+
+
+def ag_plan():
+    """Plan name from the running language server, or fallback to config."""
+    try:
+        pid, token = find_language_server()
+        for port in listening_ports(pid):
+            try:
+                data = ag_get_user_status(port, token)
+            except (urllib.error.URLError, OSError, ValueError):
+                continue
+            name = (((data.get("userStatus") or {}).get("planStatus") or {}).get("planInfo") or {}).get("planName")
+            if name:
+                return name
+    except Exception:
+        pass
+
+    # Check CLI settings as a hint
+    agy_settings = os.path.join(HOME, ".gemini", "antigravity-cli", "settings.json")
+    if os.path.exists(agy_settings):
+        try:
+            with open(agy_settings) as f:
+                s = json.load(f)
+                if s.get("model"):
+                    return "Pro"
+        except Exception:
+            pass
+    return "Pro"
+
+
+def find_language_server():
+    """Return (pid, csrf_token) of the running Antigravity language server."""
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % entry, "rb") as f:
+                args = [a.decode(errors="replace") for a in f.read().split(b"\0") if a]
+        except OSError:
+            continue
+        if not args or "language_server" not in args[0]:
+            continue
+        if cmd_flag("--app_data_dir", args) != "antigravity" and "/antigravity/" not in args[0].lower():
+            continue
+        token = cmd_flag("--csrf_token", args)
+        if token:
+            return int(entry), token
+    raise FetchError("ag_not_running")
+
+
+def cmd_flag(name, args):
+    for i, a in enumerate(args):
+        if a == name and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(name + "="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def listening_ports(pid):
+    """TCP LISTEN ports owned by the process, read from /proc."""
+    inodes = set()
+    try:
+        for fd in os.listdir("/proc/%d/fd" % pid):
+            try:
+                target = os.readlink("/proc/%d/fd/%s" % (pid, fd))
+            except OSError:
+                continue
+            if target.startswith("socket:[") and target.endswith("]"):
+                inodes.add(target[8:-1])
+    except OSError:
+        return []
+    ports = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(table) as f:
+                rows = f.readlines()[1:]
+        except OSError:
+            continue
+        for row in rows:
+            parts = row.split()
+            if len(parts) > 9 and parts[3] == "0A" and parts[9] in inodes:
+                ports.add(int(parts[1].rsplit(":", 1)[1], 16))
+    return sorted(ports)
+
+
+def ag_get_user_status(port, token):
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPSHandler(context=ctx))
+    body = json.dumps({"metadata": {"ideName": "antigravity", "extensionName": "antigravity", "locale": "en"}}).encode()
+    req = urllib.request.Request(
+        "https://127.0.0.1:%d/exa.language_server_pb.LanguageServerService/GetUserStatus" % port,
+        data=body,
+        headers={"Content-Type": "application/json", "Connect-Protocol-Version": "1", "X-Codeium-Csrf-Token": token},
+        method="POST",
+    )
+    with opener.open(req, timeout=AG_CLI_TIMEOUT) as resp:
+        return json.load(resp)
+
+
+def fetch_antigravity():
+    return {"plan": ag_plan(), "windows": parse_agy_usage(run_agy_usage())}
+
+
+def apply_exhausted_week(windows):
+    """A spent weekly limit blocks the 5-hour one too, so show that window as spent as well."""
+    weekly = {w["model"]: w for w in windows if w["key"] == "weekly"}
+    for w in windows:
+        if w["key"] == "session" and w["model"] in weekly and (weekly[w["model"]].get("usedPercent") or 0) >= 100:
+            w["usedPercent"] = 100.0
+    return windows
+
+
 # Main
 
 
-PROVIDERS = (("claude", "Claude", fetch_claude), ("codex", "Codex", fetch_codex))
+PROVIDERS = (
+    ("claude", "Claude", fetch_claude),
+    ("codex", "Codex", fetch_codex),
+    ("antigravity", "Antigravity", fetch_antigravity),
+)
 
 
 def expire_window(w):
@@ -310,6 +526,8 @@ def main():
     providers = []
     for pid, name, result, error in results:
         if result is not None:
+            if "windows" in result:
+                result["windows"] = apply_exhausted_week(result["windows"])
             cache[pid] = result
             providers.append({"id": pid, "name": name, "ok": True, "stale": False, "errorCode": None, "errorDetail": None, **result})
         elif pid in cache:
