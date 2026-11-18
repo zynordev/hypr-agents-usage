@@ -13,7 +13,7 @@ AbstractBackgroundWidget {
     configEntryName: "agentsUsage"
     hoverEnabled: true
 
-    property real widgetWidth: 420
+    property real widgetWidth: 440
     property real cardSpacing: 12
     property real cardHeight: 120
     property real cardWidth: (widgetWidth - cardSpacing * 2) / 3
@@ -57,7 +57,7 @@ AbstractBackgroundWidget {
         ColumnLayout {
             anchors {
                 fill: parent
-                margins: 14
+                margins: 12
             }
             spacing: -4
 
@@ -70,8 +70,8 @@ AbstractBackgroundWidget {
                 iconSize: 18
                 fill: 1
                 padding: 6
-                implicitWidth: 34
-                implicitHeight: 34
+                implicitWidth: 32
+                implicitHeight: 32
             }
 
             Item { Layout.fillHeight: true }
@@ -120,6 +120,7 @@ AbstractBackgroundWidget {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
 
+        // 1. Claude Card
         StatCard {
             icon: "psychology"
             value: AgentsUsage.ready ? (AgentsUsage.claudeUsed + "%") : "..."
@@ -129,6 +130,8 @@ AbstractBackgroundWidget {
             bgColor: Appearance.colors.colPrimaryContainer
             shapeColor: Appearance.colors.colPrimary
         }
+
+        // 2. Codex Card
         StatCard {
             icon: "terminal"
             value: AgentsUsage.ready ? (AgentsUsage.codexUsed + "%") : "..."
@@ -138,14 +141,208 @@ AbstractBackgroundWidget {
             bgColor: Appearance.colors.colSecondaryContainer
             shapeColor: Appearance.colors.colSecondary
         }
-        StatCard {
-            icon: "spark"
-            value: AgentsUsage.ready ? (AgentsUsage.antigravityUsed + "%") : "..."
-            label: "Antigravity"
-            sublabel: AgentsUsage.ready ? (AgentsUsage.antigravityInfo.geminiSession + "% 5s") : ""
-            shape: MaterialShape.Shape.Cookie12Sided
-            bgColor: Appearance.colors.colTertiaryContainer
-            shapeColor: Appearance.colors.colTertiary
+
+        // 3. Antigravity Card (Kendisi 3 yatay çizgiye ve hemen sağında %'ye dönüşen kutu)
+        Rectangle {
+            id: agCard
+            implicitWidth: root.cardWidth
+            implicitHeight: root.cardHeight
+            radius: Appearance.rounding?.verylarge ?? 30
+            color: Appearance.colors.colTertiaryContainer
+
+            StyledRectangularShadow {
+                target: agCard
+                z: -2
+                visible: Config.options.background.widgets.shadow
+            }
+
+            FastBlurred {
+                anchors.fill: parent
+                blurSource: root.wallpaperItem
+                cardRadius: agCard.radius
+                tint: Appearance.colors.colLayer1
+                tintOpacity: 0.55
+                trackX: agCard.x + root.x
+                trackY: agCard.y + root.y
+                visible: Config.options.background.widgets.blurWidgets 
+            }
+
+            ColumnLayout {
+                anchors {
+                    fill: parent
+                    margins: 12
+                }
+                spacing: 4
+
+                // Header Row
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    StyledText {
+                        text: "Antigravity"
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.weight: Font.Bold
+                        color: Appearance.colors.colOnTertiaryContainer
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    MaterialShapeWrappedMaterialSymbol {
+                        shape: MaterialShape.Shape.Cookie12Sided
+                        color: Appearance.colors.colTertiary
+                        colSymbol: Appearance.colors.colOnTertiary
+                        text: "spark"
+                        iconSize: 13
+                        fill: 1
+                        padding: 4
+                        implicitWidth: 24
+                        implicitHeight: 24
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+
+                // Line 1: Gemini Models
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+
+                    StyledText {
+                        text: "Gemini Models"
+                        font.pixelSize: 9
+                        font.weight: Font.Medium
+                        color: Appearance.colors.colOnTertiaryContainer
+                        opacity: 0.75
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        // Yatay Çizgi
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 5
+                            radius: 2.5
+                            color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.geminiWeekly)) / 100), AgentsUsage.antigravityInfo.geminiWeekly > 0 ? 3 : 0)
+                                radius: 2.5
+                                color: Appearance.colors.colTertiary
+                            }
+                        }
+
+                        // Çizginin hemen sağında %
+                        StyledText {
+                            text: `${AgentsUsage.antigravityInfo.geminiWeekly}%`
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Appearance.colors.colOnTertiaryContainer
+                        }
+                    }
+                }
+
+                // Line 2: Claude / ChatGPT
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+
+                    StyledText {
+                        text: "Claude/ChatGPT"
+                        font.pixelSize: 9
+                        font.weight: Font.Medium
+                        color: Appearance.colors.colOnTertiaryContainer
+                        opacity: 0.75
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        // Yatay Çizgi
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 5
+                            radius: 2.5
+                            color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.claudeWeekly)) / 100), AgentsUsage.antigravityInfo.claudeWeekly > 0 ? 3 : 0)
+                                radius: 2.5
+                                color: Appearance.colors.colTertiary
+                            }
+                        }
+
+                        // Çizginin hemen sağında %
+                        StyledText {
+                            text: `${AgentsUsage.antigravityInfo.claudeWeekly}%`
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Appearance.colors.colOnTertiaryContainer
+                        }
+                    }
+                }
+
+                // Line 3: Argon
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+
+                    StyledText {
+                        text: "Argon"
+                        font.pixelSize: 9
+                        font.weight: Font.Medium
+                        color: Appearance.colors.colOnTertiaryContainer
+                        opacity: 0.75
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        // Yatay Çizgi
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 5
+                            radius: 2.5
+                            color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.argonWeekly)) / 100), AgentsUsage.antigravityInfo.argonWeekly > 0 ? 3 : 0)
+                                radius: 2.5
+                                color: Appearance.colors.colTertiary
+                            }
+                        }
+
+                        // Çizginin hemen sağında %
+                        StyledText {
+                            text: `${AgentsUsage.antigravityInfo.argonWeekly}%`
+                            font.pixelSize: 10
+                            font.weight: Font.Bold
+                            color: Appearance.colors.colOnTertiaryContainer
+                        }
+                    }
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onDoubleClicked: {
+                    AgentsUsage.refresh();
+                }
+            }
         }
     }
 

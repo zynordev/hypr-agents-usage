@@ -93,10 +93,20 @@ c.setdefault("background", {}).setdefault("widgets", {})["agentsUsage"] = {
     "z": 26
 }
 
-# Görev çubuğunun sol köşesine butonu ekle
+# Görev çubuğunun sağ tarafına butonu ekle
+right = c.setdefault("bar", {}).setdefault("layouts", {}).get("rightLayout", [])
+if "agentsUsage" not in right:
+    if "batteryIndicator" in right:
+        idx = right.index("batteryIndicator")
+        right.insert(idx, "agentsUsage")
+    else:
+        right.append("agentsUsage")
+    c["bar"]["layouts"]["rightLayout"] = right
+
+# Sol tarafta varsa temizle
 left = c.setdefault("bar", {}).setdefault("layouts", {}).get("leftLayout", [])
-if "agentsUsage" not in left:
-    left.insert(0, "agentsUsage")
+if "agentsUsage" in left:
+    left.remove("agentsUsage")
     c["bar"]["layouts"]["leftLayout"] = left
 
 with open(path, "w") as f:

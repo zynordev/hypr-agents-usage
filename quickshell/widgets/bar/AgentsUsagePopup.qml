@@ -20,8 +20,8 @@ PopupWindow {
     anchor {
         window: targetItem ? targetItem.QsWindow.window : null
         item: targetItem
-        edges: Edges.Top
-        gravity: Edges.Top
+        edges: Edges.Top | Edges.Left
+        gravity: Edges.Top | Edges.Left
     }
 
     implicitWidth: 390

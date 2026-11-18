@@ -6,55 +6,74 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-RippleButton {
+Item {
     id: root
     property bool vertical: Config.options.bar.vertical
     property bool isMaterial: Config.options.bar.cornerStyle === 3
     property bool mirrored: false
 
-    implicitWidth: 26
-    implicitHeight: 26
+    implicitWidth: 32
+    implicitHeight: 30
 
-    buttonRadius: Appearance.rounding.full
-    colBackground: isMaterial ? Appearance.colors.colPrimaryContainer : (popup.isOpen ? Appearance.colors.colLayer1Active : "transparent")
-    colBackgroundHover: isMaterial ? Appearance.colors.colPrimaryContainerHover : Appearance.colors.colLayer1Hover
-    colRipple: Appearance.colors.colLayer1Active
-    colBackgroundToggled: Appearance.colors.colSecondaryContainer
-    colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
-    colRippleToggled: Appearance.colors.colSecondaryContainerActive
-    toggled: popup.isOpen
-
-    onPressed: {
-        popup.isOpen = !popup.isOpen;
-        if (popup.isOpen) {
-            AgentsUsage.refresh();
-        }
-    }
-
-    Item {
+    Rectangle {
+        id: buttonBg
         anchors.centerIn: parent
-        width: 20
-        height: 20
+        width: 28
+        height: 28
+        radius: Appearance.rounding.full
+        color: popup.isOpen
+            ? Appearance.colors.colPrimary
+            : (mouseArea.containsMouse ? Appearance.colors.colPrimaryContainer : Appearance.colors.colLayer1Base)
+        border.width: 1
+        border.color: popup.isOpen ? Appearance.colors.colPrimary : Appearance.colors.colLayer0Border
+
+        Behavior on color {
+            ColorAnimation { duration: 150 }
+        }
 
         MaterialSymbol {
             anchors.centerIn: parent
             iconSize: 18
             text: "neurology"
-            color: popup.isOpen ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0
+            color: popup.isOpen
+                ? Appearance.colors.colOnPrimary
+                : (mouseArea.containsMouse ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer0)
         }
 
-        // Tiny status dot (green if all ok, red if error)
+        // Live status dot (green if all providers ok)
         Rectangle {
             anchors {
                 bottom: parent.bottom
                 right: parent.right
-                bottomMargin: 0
-                rightMargin: 0
+                bottomMargin: 2
+                rightMargin: 2
             }
-            width: 5
-            height: 5
-            radius: 2.5
-            color: (AgentsUsage.ready && AgentsUsage.claudeInfo.ok && AgentsUsage.codexInfo.ok && AgentsUsage.antigravityInfo.ok) ? "#4ade80" : Appearance.colors.colPrimary
+            width: 7
+            height: 7
+            radius: 3.5
+            color: (AgentsUsage.ready && AgentsUsage.claudeInfo.ok && AgentsUsage.codexInfo.ok && AgentsUsage.antigravityInfo.ok)
+                ? "#4ade80"
+                : Appearance.colors.colPrimary
+            border.width: 1
+            border.color: Appearance.colors.colLayer0
+        }
+    }
+
+    PopupToolTip {
+        text: "AI Ajan Limitleri"
+        anchorEdges: Edges.Top
+    }
+
+    MouseArea {
+        id: mouseArea
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+            popup.isOpen = !popup.isOpen;
+            if (popup.isOpen) {
+                AgentsUsage.refresh();
+            }
         }
     }
 
