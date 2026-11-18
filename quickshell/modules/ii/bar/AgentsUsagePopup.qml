@@ -296,8 +296,8 @@ LazyLoader {
                                     Layout.fillWidth: true
                                     spacing: 6
                                     CustomIcon {
-                                        width: 18
-                                        height: 18
+                                        width: 20
+                                        height: 20
                                         source: "claude-symbolic.svg"
                                         colorize: true
                                         color: Appearance.colors.colPrimary

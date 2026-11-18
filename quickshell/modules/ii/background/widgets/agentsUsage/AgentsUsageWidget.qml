@@ -71,8 +71,8 @@ AbstractBackgroundWidget {
 
                 CustomIcon {
                     anchors.centerIn: parent
-                    width: 18
-                    height: 18
+                    width: 20
+                    height: 20
                     source: statCard.customIcon
                     colorize: true
                     color: statCard.iconColor
