@@ -29,7 +29,8 @@ LazyLoader {
 
         color: "transparent"
         anchors.left: true
-        anchors.top: true
+        anchors.bottom: root.barEdge === "bottom"
+        anchors.top: root.barEdge !== "bottom"
 
         implicitWidth: 390 + Appearance.sizes.elevationMargin * 2
         implicitHeight: Math.min(600, popupContent.implicitHeight + 28) + Appearance.sizes.elevationMargin * 2
@@ -40,17 +41,10 @@ LazyLoader {
             const targetX = mapped ? mapped.x : 1500;
             const margin = Appearance.sizes.elevationMargin;
             const w = 390;
+            const screenW = (popupWindow.screen && popupWindow.screen.width) ? popupWindow.screen.width : 1920;
             // Align right edge of popup with targetItem
             const idealX = targetX + root.targetItem.width - w;
-            return Math.max(margin, Math.min(idealX, popupWindow.screen.width - w - margin - 10));
-        }
-
-        readonly property real centerOffsetY: {
-            if (!root.targetItem) return 100;
-            const margin = Appearance.sizes.elevationMargin;
-            const h = popupWindow.implicitHeight;
-            // Position above the bottom bar
-            return Math.max(margin, popupWindow.screen.height - h - root.barThickness - 6);
+            return Math.max(margin, Math.min(idealX, screenW - w - margin - 10));
         }
 
         mask: Region {
@@ -61,11 +55,19 @@ LazyLoader {
 
         margins {
             left: popupWindow.centerOffsetX
-            top: popupWindow.centerOffsetY
+            bottom: root.barEdge === "bottom" ? (root.barThickness + 6) : 0
+            top: root.barEdge !== "bottom" ? (root.barThickness + 6) : 0
         }
 
         WlrLayershell.namespace: "quickshell:popup"
         WlrLayershell.layer: WlrLayer.Overlay
+
+        Component.onCompleted: GlobalFocusGrab.addDismissable(popupWindow)
+        Component.onDestruction: GlobalFocusGrab.removeDismissable(popupWindow)
+        Connections {
+            target: GlobalFocusGrab
+            function onDismissed() { root.isOpen = false }
+        }
 
         property int activeTab: 0 // 0: Limitler, 1: Tokenlar
 
@@ -293,9 +295,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "psychology"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 20
+                                        height: 20
+                                        source: "claude-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colPrimary
                                     }
                                     StyledText {
@@ -442,9 +446,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "terminal"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 18
+                                        height: 18
+                                        source: "openai-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colSecondary
                                     }
                                     StyledText {
@@ -546,9 +552,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "spark"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 18
+                                        height: 18
+                                        source: "antigravity-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colTertiary
                                     }
                                     StyledText {
@@ -891,9 +899,11 @@ LazyLoader {
                                         }
                                         spacing: 6
 
-                                        MaterialSymbol {
-                                            text: modelData.provider === "claude" ? "psychology" : "terminal"
-                                            iconSize: 14
+                                        CustomIcon {
+                                            width: 14
+                                            height: 14
+                                            source: modelData.provider === "claude" ? "claude-symbolic.svg" : "openai-symbolic.svg"
+                                            colorize: true
                                             color: modelData.provider === "claude" ? Appearance.colors.colPrimary : Appearance.colors.colSecondary
                                         }
 

@@ -16,11 +16,13 @@ echo "1. Dosyalar kopyalanıyor..."
 mkdir -p "$QS_DIR/services"
 mkdir -p "$QS_DIR/modules/ii/background/widgets/agentsUsage"
 mkdir -p "$QS_DIR/modules/ii/bar"
+mkdir -p "$QS_DIR/assets/icons"
 
 cp "$SCRIPT_DIR/quickshell/services/AgentsUsage.qml" "$QS_DIR/services/AgentsUsage.qml"
 cp "$SCRIPT_DIR/quickshell/widgets/desktop/AgentsUsageWidget.qml" "$QS_DIR/modules/ii/background/widgets/agentsUsage/AgentsUsageWidget.qml"
 cp "$SCRIPT_DIR/quickshell/widgets/bar/AgentsUsage.qml" "$QS_DIR/modules/ii/bar/AgentsUsage.qml"
 cp "$SCRIPT_DIR/quickshell/widgets/bar/AgentsUsagePopup.qml" "$QS_DIR/modules/ii/bar/AgentsUsagePopup.qml"
+cp "$SCRIPT_DIR/quickshell/assets/icons/"*.svg "$QS_DIR/assets/icons/"
 
 echo "2. WidgetsLoader ve Config şeması kontrol ediliyor..."
 # Config.qml şeması

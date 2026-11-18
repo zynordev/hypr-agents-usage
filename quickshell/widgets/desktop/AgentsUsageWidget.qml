@@ -25,12 +25,14 @@ AbstractBackgroundWidget {
     component StatCard: Rectangle {
         id: statCard
         property string icon: ""
+        property string customIcon: ""
         property string value: ""
         property string label: ""
         property string sublabel: ""
         property int shape: MaterialShape.Shape.Cookie12Sided
         property color bgColor: Appearance.colors.colPrimaryContainer
         property color shapeColor: Appearance.colors.colPrimary
+        property color iconColor: Appearance.colors.colOnPrimary
 
         implicitWidth: root.cardWidth
         implicitHeight: root.cardHeight
@@ -61,17 +63,30 @@ AbstractBackgroundWidget {
             }
             spacing: -4
 
-            MaterialShapeWrappedMaterialSymbol {
+            MaterialShape {
                 Layout.alignment: Qt.AlignRight
                 shape: statCard.shape
                 color: statCard.shapeColor
-                colSymbol: Appearance.colors.colOnPrimary
-                text: statCard.icon
-                iconSize: 18
-                fill: 1
-                padding: 6
-                implicitWidth: 32
-                implicitHeight: 32
+                implicitSize: 32
+
+                CustomIcon {
+                    anchors.centerIn: parent
+                    width: 20
+                    height: 20
+                    source: statCard.customIcon
+                    colorize: true
+                    color: statCard.iconColor
+                    visible: statCard.customIcon !== ""
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    color: statCard.iconColor
+                    text: statCard.icon
+                    iconSize: 18
+                    fill: 1
+                    visible: statCard.customIcon === ""
+                }
             }
 
             Item { Layout.fillHeight: true }
@@ -100,13 +115,18 @@ AbstractBackgroundWidget {
                 }
             }
         }
+    }
 
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onDoubleClicked: {
-                AgentsUsage.refresh();
-            }
+    onClicked: (mouse) => {
+        if (mouse.button === Qt.RightButton) {
+            Config.options.background.widgetsLocked = !Config.options.background.widgetsLocked
+        } else if (mouse.modifiers & Qt.ControlModifier) {
+            root.selected = !root.selected
+        } else {
+            var canvas = findCanvas(root.parent)
+            if (canvas) canvas.clearSelection()
+            root.selected = true
+            AgentsUsage.refresh()
         }
     }
 
@@ -115,6 +135,11 @@ AbstractBackgroundWidget {
         columns: root.isVertical ? 1 : 3
         rows: root.isVertical ? 3 : 1
         spacing: root.cardSpacing
+        opacity: AgentsUsage.loading ? 0.75 : 1.0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 250 }
+        }
 
         Behavior on columns {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
@@ -122,24 +147,26 @@ AbstractBackgroundWidget {
 
         // 1. Claude Card
         StatCard {
-            icon: "psychology"
+            customIcon: "claude-symbolic.svg"
             value: AgentsUsage.ready ? (AgentsUsage.claudeUsed + "%") : "..."
             label: "Claude"
             sublabel: AgentsUsage.ready ? (AgentsUsage.claudeInfo.sessionPercent + "% 5s") : ""
             shape: MaterialShape.Shape.Gem
             bgColor: Appearance.colors.colPrimaryContainer
             shapeColor: Appearance.colors.colPrimary
+            iconColor: Appearance.colors.colOnPrimary
         }
 
         // 2. Codex Card
         StatCard {
-            icon: "terminal"
+            customIcon: "openai-symbolic.svg"
             value: AgentsUsage.ready ? (AgentsUsage.codexUsed + "%") : "..."
             label: "Codex"
             sublabel: AgentsUsage.ready && AgentsUsage.codexInfo.sessionPercent !== null ? (AgentsUsage.codexInfo.sessionPercent + "% 5s") : ""
             shape: MaterialShape.Shape.Cookie4Sided
             bgColor: Appearance.colors.colSecondaryContainer
             shapeColor: Appearance.colors.colSecondary
+            iconColor: Appearance.colors.colOnSecondary
         }
 
         // 3. Antigravity Card (Kendisi 3 yatay çizgiye ve hemen sağında %'ye dönüşen kutu)
@@ -149,6 +176,7 @@ AbstractBackgroundWidget {
             implicitHeight: root.cardHeight
             radius: Appearance.rounding?.verylarge ?? 30
             color: Appearance.colors.colTertiaryContainer
+            clip: true
 
             StyledRectangularShadow {
                 target: agCard
@@ -170,9 +198,12 @@ AbstractBackgroundWidget {
             ColumnLayout {
                 anchors {
                     fill: parent
-                    margins: 12
+                    topMargin: 8
+                    bottomMargin: 8
+                    leftMargin: 11
+                    rightMargin: 11
                 }
-                spacing: 4
+                spacing: 2
 
                 // Header Row
                 RowLayout {
@@ -181,27 +212,28 @@ AbstractBackgroundWidget {
 
                     StyledText {
                         text: "Antigravity"
-                        font.pixelSize: Appearance.font.pixelSize.small
+                        font.pixelSize: Appearance.font.pixelSize.smaller ?? 11
                         font.weight: Font.Bold
                         color: Appearance.colors.colOnTertiaryContainer
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    MaterialShapeWrappedMaterialSymbol {
+                    MaterialShape {
                         shape: MaterialShape.Shape.Cookie12Sided
                         color: Appearance.colors.colTertiary
-                        colSymbol: Appearance.colors.colOnTertiary
-                        text: "spark"
-                        iconSize: 13
-                        fill: 1
-                        padding: 4
-                        implicitWidth: 24
-                        implicitHeight: 24
+                        implicitSize: 20
+
+                        CustomIcon {
+                            anchors.centerIn: parent
+                            width: 12
+                            height: 12
+                            source: "antigravity-symbolic.svg"
+                            colorize: true
+                            color: Appearance.colors.colOnTertiary
+                        }
                     }
                 }
-
-                Item { Layout.fillHeight: true }
 
                 // Line 1: Gemini Models
                 ColumnLayout {
@@ -223,24 +255,24 @@ AbstractBackgroundWidget {
                         // Yatay Çizgi
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 5
-                            radius: 2.5
+                            implicitHeight: 4
+                            radius: 2
                             color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
 
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
-                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.geminiWeekly)) / 100), AgentsUsage.antigravityInfo.geminiWeekly > 0 ? 3 : 0)
-                                radius: 2.5
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.geminiWeekly ?? 0)) / 100), (AgentsUsage.antigravityInfo.geminiWeekly ?? 0) > 0 ? 3 : 0)
+                                radius: 2
                                 color: Appearance.colors.colTertiary
                             }
                         }
 
                         // Çizginin hemen sağında %
                         StyledText {
-                            text: `${AgentsUsage.antigravityInfo.geminiWeekly}%`
-                            font.pixelSize: 10
+                            text: `${AgentsUsage.antigravityInfo.geminiWeekly ?? 0}%`
+                            font.pixelSize: 9
                             font.weight: Font.Bold
                             color: Appearance.colors.colOnTertiaryContainer
                         }
@@ -267,24 +299,24 @@ AbstractBackgroundWidget {
                         // Yatay Çizgi
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 5
-                            radius: 2.5
+                            implicitHeight: 4
+                            radius: 2
                             color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
 
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
-                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.claudeWeekly)) / 100), AgentsUsage.antigravityInfo.claudeWeekly > 0 ? 3 : 0)
-                                radius: 2.5
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.claudeWeekly ?? 0)) / 100), (AgentsUsage.antigravityInfo.claudeWeekly ?? 0) > 0 ? 3 : 0)
+                                radius: 2
                                 color: Appearance.colors.colTertiary
                             }
                         }
 
                         // Çizginin hemen sağında %
                         StyledText {
-                            text: `${AgentsUsage.antigravityInfo.claudeWeekly}%`
-                            font.pixelSize: 10
+                            text: `${AgentsUsage.antigravityInfo.claudeWeekly ?? 0}%`
+                            font.pixelSize: 9
                             font.weight: Font.Bold
                             color: Appearance.colors.colOnTertiaryContainer
                         }
@@ -311,36 +343,28 @@ AbstractBackgroundWidget {
                         // Yatay Çizgi
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 5
-                            radius: 2.5
+                            implicitHeight: 4
+                            radius: 2
                             color: ColorUtils.transparentize(Appearance.colors.colTertiary, 0.75)
 
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.top: parent.top
                                 anchors.bottom: parent.bottom
-                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.argonWeekly)) / 100), AgentsUsage.antigravityInfo.argonWeekly > 0 ? 3 : 0)
-                                radius: 2.5
+                                width: Math.max(parent.width * (Math.min(100, Math.max(0, AgentsUsage.antigravityInfo.argonWeekly ?? 0)) / 100), (AgentsUsage.antigravityInfo.argonWeekly ?? 0) > 0 ? 3 : 0)
+                                radius: 2
                                 color: Appearance.colors.colTertiary
                             }
                         }
 
                         // Çizginin hemen sağında %
                         StyledText {
-                            text: `${AgentsUsage.antigravityInfo.argonWeekly}%`
-                            font.pixelSize: 10
+                            text: `${AgentsUsage.antigravityInfo.argonWeekly ?? 0}%`
+                            font.pixelSize: 9
                             font.weight: Font.Bold
                             color: Appearance.colors.colOnTertiaryContainer
                         }
                     }
-                }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onDoubleClicked: {
-                    AgentsUsage.refresh();
                 }
             }
         }

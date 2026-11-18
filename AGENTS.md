@@ -1,7 +1,7 @@
-# AGENTS.md — Agents Usage (KDE Plasma & Hyprland)
+# AGENTS.md — Hypr Agents Usage (Hyprland & KDE Plasma)
 
 ## 📌 Proje Genel Bakışı
-Bu depo, **Claude Code**, **OpenAI Codex** ve **Google Antigravity** yapay zeka araçlarının kullanım limitlerini, kalan kotalarını ve maliyetlerini hem **KDE Plasma 6** hem de **Hyprland (QuickShell)** masaüstü ortamlarında görselleştiren widget ve servis ekosistemidir.
+Bu depo, **Claude Code**, **OpenAI Codex** ve **Google Antigravity** yapay zeka araçlarının kullanım limitlerini, kalan kotalarını ve maliyetlerini hem **Hyprland (QuickShell)** hem de **KDE Plasma 6** masaüstü ortamlarında görselleştiren widget ve servis ekosistemidir.
 
 Bu depo, [yusufipk/kde-agents-usage](https://github.com/yusufipk/kde-agents-usage) projesinin geliştirilmiş ve Hyprland desteği eklenmiş fork'udur.
 
@@ -11,23 +11,23 @@ Bu depo, [yusufipk/kde-agents-usage](https://github.com/yusufipk/kde-agents-usag
 1. **Claude Code (`claude`):**
    - 5 saatlik kayan oturum limiti (`five_hour` / `session`)
    - 7 günlük haftalık limit (`seven_day` / `weekly`)
-   - Canlı OAuth API ve yerel `~/.config/Claude/plan-usage-history.json` güvenli fallback desteği
+   - Orijinal Claude yıldız logosu ve `plan-usage-history.json` anlık inotify olay dinleyicisi
 2. **OpenAI Codex (`codex`):**
    - Haftalık limit (`weekly`) ve aktif oturum limiti
-   - `~/.codex/auth.json` otomatik token yenileme desteği
+   - Orijinal ChatGPT logosu ve `~/.codex/auth.json` otomatik token yenileme desteği
 3. **Google Antigravity (`agy`):**
    - Gemini Modelleri (Haftalık & 5 Saatlik Limit)
    - Claude & GPT Modelleri (Haftalık & 5 Saatlik Limit)
    - Gemini 4 Argon Modeli (Haftalık Limit)
-   - `agy -p /usage` entegrasyonu ve dil sunucusu plan tespiti
+   - Orijinal Google Antigravity yay logosu ve `agy -p /usage` entegrasyonu
 
 ---
 
 ## 🚀 Çalışma Ortamları ve Kurulum
 
 ### 1. Hyprland (QuickShell / end-4 dots)
-- **Masaüstü Widgetı:** Masaüstünde 3 ajanın (Claude, Codex, Antigravity) anlık kullanım yüzdelerini Material You kartlarıyla gösterir.
-- **Görev Çubuğu (Bar) Butonu & Popup:** Sol alt köşedeki nöroloji/AI butonuna tıklandığında açılan detaylı panel:
+- **Masaüstü Widgetı:** Masaüstünde 3 ajanın (Claude, Codex, Antigravity) anlık kullanım yüzdelerini Material You kartlarıyla gösterir. Serbestçe sürüklenebilir, döndürülebilir ve tıklanarak anında yenilenebilir.
+- **Görev Çubuğu (Bar) Butonu & Popup:** Sağ alt köşedeki nöroloji/AI butonuna tıklandığında açılan detaylı panel:
   - *Limitler Sekmesi:* Sağlayıcı rozetleri (Pro, Plus), kalan/kullanılan çubukları, sıfırlanma geri sayımları.
   - *Tokenlar & Maliyet Sekmesi:* 1g / 7g / 30g / 1y dönem filtreleri, model bazında token sayıları ve tahmini API maliyetleri.
 

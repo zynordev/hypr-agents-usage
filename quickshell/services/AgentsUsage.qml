@@ -8,8 +8,8 @@ import QtQuick
 Singleton {
     id: root
 
-    readonly property string scriptPath: "/home/halil/kde-agents-usage/package/contents/code/fetch_usage.py"
-    readonly property string tokenScriptPath: "/home/halil/kde-agents-usage/package/contents/code/token_stats.py"
+    readonly property string scriptPath: "/home/halil/hypr-agents-usage/package/contents/code/fetch_usage.py"
+    readonly property string tokenScriptPath: "/home/halil/hypr-agents-usage/package/contents/code/token_stats.py"
 
     property bool ready: false
     property bool loading: false
