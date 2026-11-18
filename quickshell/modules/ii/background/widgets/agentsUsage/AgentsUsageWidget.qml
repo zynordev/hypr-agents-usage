@@ -115,13 +115,18 @@ AbstractBackgroundWidget {
                 }
             }
         }
+    }
 
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                AgentsUsage.refresh();
-            }
+    onClicked: (mouse) => {
+        if (mouse.button === Qt.RightButton) {
+            Config.options.background.widgetsLocked = !Config.options.background.widgetsLocked
+        } else if (mouse.modifiers & Qt.ControlModifier) {
+            root.selected = !root.selected
+        } else {
+            var canvas = findCanvas(root.parent)
+            if (canvas) canvas.clearSelection()
+            root.selected = true
+            AgentsUsage.refresh()
         }
     }
 
@@ -360,14 +365,6 @@ AbstractBackgroundWidget {
                             color: Appearance.colors.colOnTertiaryContainer
                         }
                     }
-                }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    AgentsUsage.refresh();
                 }
             }
         }
