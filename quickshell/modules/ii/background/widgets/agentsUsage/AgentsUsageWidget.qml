@@ -25,12 +25,14 @@ AbstractBackgroundWidget {
     component StatCard: Rectangle {
         id: statCard
         property string icon: ""
+        property string customIcon: ""
         property string value: ""
         property string label: ""
         property string sublabel: ""
         property int shape: MaterialShape.Shape.Cookie12Sided
         property color bgColor: Appearance.colors.colPrimaryContainer
         property color shapeColor: Appearance.colors.colPrimary
+        property color iconColor: Appearance.colors.colOnPrimary
 
         implicitWidth: root.cardWidth
         implicitHeight: root.cardHeight
@@ -61,17 +63,30 @@ AbstractBackgroundWidget {
             }
             spacing: -4
 
-            MaterialShapeWrappedMaterialSymbol {
+            MaterialShape {
                 Layout.alignment: Qt.AlignRight
                 shape: statCard.shape
                 color: statCard.shapeColor
-                colSymbol: Appearance.colors.colOnPrimary
-                text: statCard.icon
-                iconSize: 18
-                fill: 1
-                padding: 6
-                implicitWidth: 32
-                implicitHeight: 32
+                implicitSize: 32
+
+                CustomIcon {
+                    anchors.centerIn: parent
+                    width: 18
+                    height: 18
+                    source: statCard.customIcon
+                    colorize: true
+                    color: statCard.iconColor
+                    visible: statCard.customIcon !== ""
+                }
+
+                MaterialSymbol {
+                    anchors.centerIn: parent
+                    color: statCard.iconColor
+                    text: statCard.icon
+                    iconSize: 18
+                    fill: 1
+                    visible: statCard.customIcon === ""
+                }
             }
 
             Item { Layout.fillHeight: true }
@@ -122,24 +137,26 @@ AbstractBackgroundWidget {
 
         // 1. Claude Card
         StatCard {
-            icon: "psychology"
+            customIcon: "claude-symbolic.svg"
             value: AgentsUsage.ready ? (AgentsUsage.claudeUsed + "%") : "..."
             label: "Claude"
             sublabel: AgentsUsage.ready ? (AgentsUsage.claudeInfo.sessionPercent + "% 5s") : ""
             shape: MaterialShape.Shape.Gem
             bgColor: Appearance.colors.colPrimaryContainer
             shapeColor: Appearance.colors.colPrimary
+            iconColor: Appearance.colors.colOnPrimary
         }
 
         // 2. Codex Card
         StatCard {
-            icon: "terminal"
+            customIcon: "openai-symbolic.svg"
             value: AgentsUsage.ready ? (AgentsUsage.codexUsed + "%") : "..."
             label: "Codex"
             sublabel: AgentsUsage.ready && AgentsUsage.codexInfo.sessionPercent !== null ? (AgentsUsage.codexInfo.sessionPercent + "% 5s") : ""
             shape: MaterialShape.Shape.Cookie4Sided
             bgColor: Appearance.colors.colSecondaryContainer
             shapeColor: Appearance.colors.colSecondary
+            iconColor: Appearance.colors.colOnSecondary
         }
 
         // 3. Antigravity Card (Kendisi 3 yatay çizgiye ve hemen sağında %'ye dönüşen kutu)
@@ -192,16 +209,19 @@ AbstractBackgroundWidget {
 
                     Item { Layout.fillWidth: true }
 
-                    MaterialShapeWrappedMaterialSymbol {
+                    MaterialShape {
                         shape: MaterialShape.Shape.Cookie12Sided
                         color: Appearance.colors.colTertiary
-                        colSymbol: Appearance.colors.colOnTertiary
-                        text: "spark"
-                        iconSize: 11
-                        fill: 1
-                        padding: 3
-                        implicitWidth: 20
-                        implicitHeight: 20
+                        implicitSize: 20
+
+                        CustomIcon {
+                            anchors.centerIn: parent
+                            width: 12
+                            height: 12
+                            source: "antigravity-symbolic.svg"
+                            colorize: true
+                            color: Appearance.colors.colOnTertiary
+                        }
                     }
                 }
 

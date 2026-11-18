@@ -295,9 +295,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "psychology"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 18
+                                        height: 18
+                                        source: "claude-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colPrimary
                                     }
                                     StyledText {
@@ -444,9 +446,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "terminal"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 18
+                                        height: 18
+                                        source: "openai-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colSecondary
                                     }
                                     StyledText {
@@ -548,9 +552,11 @@ LazyLoader {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
-                                    MaterialSymbol {
-                                        text: "spark"
-                                        iconSize: 18
+                                    CustomIcon {
+                                        width: 18
+                                        height: 18
+                                        source: "antigravity-symbolic.svg"
+                                        colorize: true
                                         color: Appearance.colors.colTertiary
                                     }
                                     StyledText {
@@ -893,9 +899,11 @@ LazyLoader {
                                         }
                                         spacing: 6
 
-                                        MaterialSymbol {
-                                            text: modelData.provider === "claude" ? "psychology" : "terminal"
-                                            iconSize: 14
+                                        CustomIcon {
+                                            width: 14
+                                            height: 14
+                                            source: modelData.provider === "claude" ? "claude-symbolic.svg" : "openai-symbolic.svg"
+                                            colorize: true
                                             color: modelData.provider === "claude" ? Appearance.colors.colPrimary : Appearance.colors.colSecondary
                                         }
 
