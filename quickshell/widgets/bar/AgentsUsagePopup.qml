@@ -4,253 +4,282 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
+import Quickshell.Wayland
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
-PopupWindow {
+LazyLoader {
     id: root
     property Item targetItem
     property bool isOpen: false
 
-    visible: isOpen
-    color: "transparent"
+    active: isOpen
 
-    anchor {
-        window: targetItem ? targetItem.QsWindow.window : null
-        item: targetItem
-        edges: Edges.Top | Edges.Left
-        gravity: Edges.Top | Edges.Left
+    readonly property bool barVertical: Config.options.bar.vertical
+    readonly property string barEdge: {
+        if (!barVertical) return Config.options.bar.bottom ? "bottom" : "top"
+        return Config.options.bar.bottom ? "right" : "left"
     }
+    readonly property real barThickness: barVertical ? Appearance.sizes.verticalBarWidth : Appearance.sizes.barHeight
 
-    implicitWidth: 390
-    implicitHeight: Math.min(600, popupContent.implicitHeight + 24)
+    component: PanelWindow {
+        id: popupWindow
 
-    property int activeTab: 0 // 0: Limitler, 1: Tokenlar
+        color: "transparent"
+        anchors.left: true
+        anchors.top: true
 
-    function remainingOf(percent) {
-        if (percent === null || percent === undefined) return null;
-        return Math.max(0, Math.min(100, Math.round(100 - percent)));
-    }
+        implicitWidth: 390 + Appearance.sizes.elevationMargin * 2
+        implicitHeight: Math.min(600, popupContent.implicitHeight + 28) + Appearance.sizes.elevationMargin * 2
 
-    function toneColor(used) {
-        if (used === null || used === undefined) return Appearance.colors.colOutline;
-        if (used >= 85) return Appearance.m3colors.m3error || "#ff5449";
-        if (used >= 60) return Appearance.m3colors.m3tertiary || "#e5a000";
-        return Appearance.colors.colPrimary;
-    }
+        readonly property real centerOffsetX: {
+            if (!root.targetItem) return 100;
+            const mapped = root.targetItem.QsWindow?.mapFromItem(root.targetItem, 0, 0);
+            const targetX = mapped ? mapped.x : 1500;
+            const margin = Appearance.sizes.elevationMargin;
+            const w = 390;
+            // Align right edge of popup with targetItem
+            const idealX = targetX + root.targetItem.width - w;
+            return Math.max(margin, Math.min(idealX, popupWindow.screen.width - w - margin - 10));
+        }
 
-    MouseArea {
-        anchors.fill: parent
-        onClicked: {} // prevent click through
-    }
+        readonly property real centerOffsetY: {
+            if (!root.targetItem) return 100;
+            const margin = Appearance.sizes.elevationMargin;
+            const h = popupWindow.implicitHeight;
+            // Position above the bottom bar
+            return Math.max(margin, popupWindow.screen.height - h - root.barThickness - 6);
+        }
 
-    StyledRectangularShadow {
-        target: bgRect
-    }
+        mask: Region {
+            item: bgRect
+        }
+        exclusionMode: ExclusionMode.Ignore
+        exclusiveZone: 0
 
-    Rectangle {
-        id: bgRect
-        anchors.fill: parent
-        anchors.margins: 6
-        radius: Appearance.rounding.windowRounding
-        color: Appearance.colors.colLayer0
-        border.width: 1
-        border.color: Appearance.colors.colLayer0Border
-        clip: true
+        margins {
+            left: popupWindow.centerOffsetX
+            top: popupWindow.centerOffsetY
+        }
 
-        ColumnLayout {
-            id: popupContent
+        WlrLayershell.namespace: "quickshell:popup"
+        WlrLayershell.layer: WlrLayer.Overlay
+
+        property int activeTab: 0 // 0: Limitler, 1: Tokenlar
+
+        function toneColor(used) {
+            if (used === null || used === undefined) return Appearance.colors.colOutline;
+            if (used >= 85) return Appearance.m3colors.m3error || "#ff5449";
+            if (used >= 60) return Appearance.m3colors.m3tertiary || "#e5a000";
+            return Appearance.colors.colPrimary;
+        }
+
+        StyledRectangularShadow {
+            target: bgRect
+        }
+
+        Rectangle {
+            id: bgRect
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 12
+            anchors.margins: Appearance.sizes.elevationMargin
+            radius: Appearance.rounding.windowRounding
+            color: Appearance.colors.colLayer0
+            border.width: 1
+            border.color: Appearance.colors.colLayer0Border
+            clip: true
 
-            // Header Row
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
+            ColumnLayout {
+                id: popupContent
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 12
 
-                MaterialShapeWrappedMaterialSymbol {
-                    shape: MaterialShape.Shape.Cookie12Sided
-                    text: "neurology"
-                    iconSize: 20
-                    implicitSize: 34
-                    color: Appearance.colors.colPrimaryContainer
-                    colSymbol: Appearance.colors.colPrimary
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: -2
-                    StyledText {
-                        text: "AI Ajan Limitleri"
-                        font.pixelSize: Appearance.font.pixelSize.normal
-                        font.weight: Font.Bold
-                        color: Appearance.colors.colOnLayer0
-                    }
-                    StyledText {
-                        text: AgentsUsage.lastUpdated ? ("Son güncelleme: " + AgentsUsage.lastUpdated) : "Yükleniyor..."
-                        font.pixelSize: Appearance.font.pixelSize.smallest
-                        color: Appearance.colors.colOnSurfaceVariant
-                        opacity: 0.7
-                    }
-                }
-
-                // Refresh Button
-                Rectangle {
-                    width: 32
-                    height: 32
-                    radius: Appearance.rounding.full
-                    color: refreshArea.containsMouse ? Appearance.colors.colLayer1Hover : "transparent"
-
-                    MaterialSymbol {
-                        id: refreshIcon
-                        anchors.centerIn: parent
-                        text: "refresh"
-                        iconSize: 18
-                        color: Appearance.colors.colPrimary
-
-                        RotationAnimation on rotation {
-                            running: AgentsUsage.loading || AgentsUsage.loadingTokens
-                            from: 0
-                            to: 360
-                            duration: 800
-                            loops: Animation.Infinite
-                        }
-                    }
-
-                    MouseArea {
-                        id: refreshArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            AgentsUsage.refresh();
-                            AgentsUsage.refreshTokenStats();
-                        }
-                    }
-                }
-
-                // Close Button
-                Rectangle {
-                    width: 28
-                    height: 28
-                    radius: Appearance.rounding.full
-                    color: closeArea.containsMouse ? Appearance.colors.colLayer1Hover : "transparent"
-
-                    MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: "close"
-                        iconSize: 16
-                        color: Appearance.colors.colOnSurfaceVariant
-                    }
-
-                    MouseArea {
-                        id: closeArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.isOpen = false
-                    }
-                }
-            }
-
-            // Tab Buttons
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: 32
-                radius: Appearance.rounding.full
-                color: Appearance.colors.colLayer1Base
-
+                // Header Row
                 RowLayout {
-                    anchors.fill: parent
-                    spacing: 0
+                    Layout.fillWidth: true
+                    spacing: 8
 
-                    Rectangle {
+                    MaterialShapeWrappedMaterialSymbol {
+                        shape: MaterialShape.Shape.Cookie12Sided
+                        text: "neurology"
+                        iconSize: 20
+                        implicitSize: 34
+                        color: Appearance.colors.colPrimaryContainer
+                        colSymbol: Appearance.colors.colPrimary
+                    }
+
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        radius: Appearance.rounding.full
-                        color: root.activeTab === 0 ? Appearance.colors.colPrimary : "transparent"
-
+                        spacing: -2
                         StyledText {
-                            anchors.centerIn: parent
-                            text: "Limitler"
-                            font.pixelSize: Appearance.font.pixelSize.small
-                            font.weight: root.activeTab === 0 ? Font.Bold : Font.Normal
-                            color: root.activeTab === 0 ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
+                            text: "AI Ajan Limitleri"
+                            font.pixelSize: Appearance.font.pixelSize.normal
+                            font.weight: Font.Bold
+                            color: Appearance.colors.colOnLayer0
                         }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.activeTab = 0
+                        StyledText {
+                            text: AgentsUsage.lastUpdated ? ("Son güncelleme: " + AgentsUsage.lastUpdated) : "Yükleniyor..."
+                            font.pixelSize: Appearance.font.pixelSize.smallest
+                            color: Appearance.colors.colOnSurfaceVariant
+                            opacity: 0.7
                         }
                     }
 
+                    // Refresh Button
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        width: 32
+                        height: 32
                         radius: Appearance.rounding.full
-                        color: root.activeTab === 1 ? Appearance.colors.colPrimary : "transparent"
+                        color: refreshArea.containsMouse ? Appearance.colors.colLayer1Hover : "transparent"
 
-                        StyledText {
+                        MaterialSymbol {
                             anchors.centerIn: parent
-                            text: "Tokenlar & Maliyet"
-                            font.pixelSize: Appearance.font.pixelSize.small
-                            font.weight: root.activeTab === 1 ? Font.Bold : Font.Normal
-                            color: root.activeTab === 1 ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
+                            text: "refresh"
+                            iconSize: 18
+                            color: Appearance.colors.colPrimary
+
+                            RotationAnimation on rotation {
+                                running: AgentsUsage.loading || AgentsUsage.loadingTokens
+                                from: 0
+                                to: 360
+                                duration: 800
+                                loops: Animation.Infinite
+                            }
                         }
 
                         MouseArea {
+                            id: refreshArea
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                root.activeTab = 1;
-                                if (!AgentsUsage.tokenData) AgentsUsage.refreshTokenStats();
+                                AgentsUsage.refresh();
+                                AgentsUsage.refreshTokenStats();
+                            }
+                        }
+                    }
+
+                    // Close Button
+                    Rectangle {
+                        width: 28
+                        height: 28
+                        radius: Appearance.rounding.full
+                        color: closeArea.containsMouse ? Appearance.colors.colLayer1Hover : "transparent"
+
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "close"
+                            iconSize: 16
+                            color: Appearance.colors.colOnSurfaceVariant
+                        }
+
+                        MouseArea {
+                            id: closeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.isOpen = false
+                        }
+                    }
+                }
+
+                // Tab Buttons
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 32
+                    radius: Appearance.rounding.full
+                    color: Appearance.colors.colLayer1Base
+
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Appearance.rounding.full
+                            color: popupWindow.activeTab === 0 ? Appearance.colors.colPrimary : "transparent"
+
+                            StyledText {
+                                anchors.centerIn: parent
+                                text: "Limitler"
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                font.weight: popupWindow.activeTab === 0 ? Font.Bold : Font.Normal
+                                color: popupWindow.activeTab === 0 ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: popupWindow.activeTab = 0
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Appearance.rounding.full
+                            color: popupWindow.activeTab === 1 ? Appearance.colors.colPrimary : "transparent"
+
+                            StyledText {
+                                anchors.centerIn: parent
+                                text: "Tokenlar & Maliyet"
+                                font.pixelSize: Appearance.font.pixelSize.small
+                                font.weight: popupWindow.activeTab === 1 ? Font.Bold : Font.Normal
+                                color: popupWindow.activeTab === 1 ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSurfaceVariant
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    popupWindow.activeTab = 1;
+                                    if (!AgentsUsage.tokenData) AgentsUsage.refreshTokenStats();
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Scrollable Content
-            Flickable {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 440
-                contentHeight: mainStack.implicitHeight
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
+                // Scrollable Content
+                Flickable {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 440
+                    contentHeight: mainStack.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
 
-                ScrollBar.vertical: ScrollBar {
-                    width: 4
-                    policy: ScrollBar.AsNeeded
-                }
+                    ScrollBar.vertical: ScrollBar {
+                        width: 4
+                        policy: ScrollBar.AsNeeded
+                    }
 
-                Item {
-                    id: mainStack
-                    width: parent.width
-                    implicitHeight: root.activeTab === 0 ? limitsTabContent.implicitHeight : tokensTabContent.implicitHeight
-
-                    // ==========================================
-                    // TAB 1: LIMITLER
-                    // ==========================================
-                    ColumnLayout {
-                        id: limitsTabContent
+                    Item {
+                        id: mainStack
                         width: parent.width
-                        visible: root.activeTab === 0
-                        spacing: 12
+                        implicitHeight: popupWindow.activeTab === 0 ? limitsTabContent.implicitHeight : tokensTabContent.implicitHeight
 
-                        // --- CLAUDE CARD ---
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: claudeCol.implicitHeight + 20
-                            radius: Appearance.rounding.normal
-                            color: Appearance.colors.colLayer1Base
-                            border.width: 1
-                            border.color: Appearance.colors.colLayer0Border
+                        // ==========================================
+                        // TAB 1: LIMITLER
+                        // ==========================================
+                        ColumnLayout {
+                            id: limitsTabContent
+                            width: parent.width
+                            visible: popupWindow.activeTab === 0
+                            spacing: 12
 
-                            ColumnLayout {
+                            // --- CLAUDE CARD ---
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: claudeCol.implicitHeight + 20
+                                radius: Appearance.rounding.normal
+                                color: Appearance.colors.colLayer1Base
+                                border.width: 1
+                                border.color: Appearance.colors.colLayer0Border
+
+                                ColumnLayout {
                                 id: claudeCol
                                 anchors {
                                     top: parent.top
@@ -260,7 +289,7 @@ PopupWindow {
                                 }
                                 spacing: 8
 
-                                // Provider Title Row
+                                // Title Row
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 6
@@ -314,7 +343,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.claudeInfo.sessionPercent} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.claudeInfo.sessionPercent)
+                                            color: popupWindow.toneColor(AgentsUsage.claudeInfo.sessionPercent)
                                         }
                                     }
                                     ProgressBar {
@@ -330,7 +359,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.claudeInfo.sessionPercent)
+                                                color: popupWindow.toneColor(AgentsUsage.claudeInfo.sessionPercent)
                                             }
                                         }
                                     }
@@ -359,7 +388,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.claudeInfo.weeklyPercent} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.claudeInfo.weeklyPercent)
+                                            color: popupWindow.toneColor(AgentsUsage.claudeInfo.weeklyPercent)
                                         }
                                     }
                                     ProgressBar {
@@ -375,7 +404,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.claudeInfo.weeklyPercent)
+                                                color: popupWindow.toneColor(AgentsUsage.claudeInfo.weeklyPercent)
                                             }
                                         }
                                     }
@@ -447,45 +476,6 @@ PopupWindow {
                                     }
                                 }
 
-                                // 5-Hour Limit (if present)
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 3
-                                    visible: AgentsUsage.codexInfo.sessionPercent !== null
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        StyledText {
-                                            text: "5 Saatlik Oturum"
-                                            font.pixelSize: Appearance.font.pixelSize.smallest
-                                            color: Appearance.colors.colOnSurfaceVariant
-                                        }
-                                        Item { Layout.fillWidth: true }
-                                        StyledText {
-                                            text: `%${AgentsUsage.codexInfo.sessionPercent} kullanıldı`
-                                            font.pixelSize: Appearance.font.pixelSize.smallest
-                                            font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.codexInfo.sessionPercent)
-                                        }
-                                    }
-                                    ProgressBar {
-                                        Layout.fillWidth: true
-                                        implicitHeight: 6
-                                        value: (AgentsUsage.codexInfo.sessionPercent || 0) / 100
-                                        background: Rectangle {
-                                            radius: 3
-                                            color: Appearance.colors.colLayer2
-                                        }
-                                        contentItem: Item {
-                                            Rectangle {
-                                                width: parent.width * parent.parent.visualPosition
-                                                height: parent.height
-                                                radius: 3
-                                                color: root.toneColor(AgentsUsage.codexInfo.sessionPercent)
-                                            }
-                                        }
-                                    }
-                                }
-
                                 // Weekly Limit
                                 ColumnLayout {
                                     Layout.fillWidth: true
@@ -502,7 +492,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.codexInfo.weeklyPercent} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.codexInfo.weeklyPercent)
+                                            color: popupWindow.toneColor(AgentsUsage.codexInfo.weeklyPercent)
                                         }
                                     }
                                     ProgressBar {
@@ -518,7 +508,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.codexInfo.weeklyPercent)
+                                                color: popupWindow.toneColor(AgentsUsage.codexInfo.weeklyPercent)
                                             }
                                         }
                                     }
@@ -606,7 +596,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.antigravityInfo.geminiWeekly} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.antigravityInfo.geminiWeekly)
+                                            color: popupWindow.toneColor(AgentsUsage.antigravityInfo.geminiWeekly)
                                         }
                                     }
                                     ProgressBar {
@@ -622,7 +612,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.antigravityInfo.geminiWeekly)
+                                                color: popupWindow.toneColor(AgentsUsage.antigravityInfo.geminiWeekly)
                                             }
                                         }
                                     }
@@ -651,7 +641,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.antigravityInfo.geminiSession} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.antigravityInfo.geminiSession)
+                                            color: popupWindow.toneColor(AgentsUsage.antigravityInfo.geminiSession)
                                         }
                                     }
                                     ProgressBar {
@@ -667,7 +657,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.antigravityInfo.geminiSession)
+                                                color: popupWindow.toneColor(AgentsUsage.antigravityInfo.geminiSession)
                                             }
                                         }
                                     }
@@ -689,7 +679,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.antigravityInfo.claudeWeekly} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.antigravityInfo.claudeWeekly)
+                                            color: popupWindow.toneColor(AgentsUsage.antigravityInfo.claudeWeekly)
                                         }
                                     }
                                     ProgressBar {
@@ -705,7 +695,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.antigravityInfo.claudeWeekly)
+                                                color: popupWindow.toneColor(AgentsUsage.antigravityInfo.claudeWeekly)
                                             }
                                         }
                                     }
@@ -727,7 +717,7 @@ PopupWindow {
                                             text: `%${AgentsUsage.antigravityInfo.argonWeekly} kullanıldı`
                                             font.pixelSize: Appearance.font.pixelSize.smallest
                                             font.weight: Font.DemiBold
-                                            color: root.toneColor(AgentsUsage.antigravityInfo.argonWeekly)
+                                            color: popupWindow.toneColor(AgentsUsage.antigravityInfo.argonWeekly)
                                         }
                                     }
                                     ProgressBar {
@@ -743,7 +733,7 @@ PopupWindow {
                                                 width: parent.width * parent.parent.visualPosition
                                                 height: parent.height
                                                 radius: 3
-                                                color: root.toneColor(AgentsUsage.antigravityInfo.argonWeekly)
+                                                color: popupWindow.toneColor(AgentsUsage.antigravityInfo.argonWeekly)
                                             }
                                         }
                                     }
@@ -758,7 +748,7 @@ PopupWindow {
                     ColumnLayout {
                         id: tokensTabContent
                         width: parent.width
-                        visible: root.activeTab === 1
+                        visible: popupWindow.activeTab === 1
                         spacing: 12
 
                         readonly property var currentPeriodData: AgentsUsage.tokenData?.periods?.[AgentsUsage.selectedPeriod]
@@ -826,7 +816,7 @@ PopupWindow {
                                     }
                                     StyledText {
                                         text: AgentsUsage.formatCost(tokensTabContent.currentPeriodData?.cost?.claude)
-                                        font.pixelSize: Appearance.font.pixelSize.medium
+                                        font.pixelSize: Appearance.font.pixelSize.large
                                         font.weight: Font.Bold
                                         color: Appearance.colors.colOnLayer0
                                     }
@@ -858,7 +848,7 @@ PopupWindow {
                                     }
                                     StyledText {
                                         text: AgentsUsage.formatCost(tokensTabContent.currentPeriodData?.cost?.codex)
-                                        font.pixelSize: Appearance.font.pixelSize.medium
+                                        font.pixelSize: Appearance.font.pixelSize.large
                                         font.weight: Font.Bold
                                         color: Appearance.colors.colOnLayer0
                                     }
@@ -946,4 +936,5 @@ PopupWindow {
             }
         }
     }
+}
 }

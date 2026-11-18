@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import qs
 import qs.services
 import qs.modules.common
@@ -57,11 +58,6 @@ Item {
             border.width: 1
             border.color: Appearance.colors.colLayer0
         }
-    }
-
-    PopupToolTip {
-        text: "AI Ajan Limitleri"
-        anchorEdges: Edges.Top
     }
 
     MouseArea {
